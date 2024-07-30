@@ -56,7 +56,7 @@ COMMENT_START   "(*"
 COMMENT_END     "*)"
 LINE_COMMENT    "--"
 BLANK           [ \t\r\v\f]*
-COMMENT         [^*\(\)\n]*
+COMMENT         [^*\n]*
 INTEGERS        [0-9][0-9]*
 TYPE_IDENTIFIERS    [A-Z][a-zA-Z0-9_]*|SELF_TYPE
 OBJECT_IDENTIFIERS  [a-z][a-zA-Z0-9_]*|self
@@ -77,17 +77,23 @@ OBJECT_IDENTIFIERS  [a-z][a-zA-Z0-9_]*|self
     if(comment_num == 0) { BEGIN(nested_comment); }
     comment_num++;
 }
-<nested_comment>{COMMENT} {}
 <nested_comment>{COMMENT_START} {
     comment_num++;
 }
+<nested_comment>. {}
 <nested_comment>"*)" {
     comment_num--;
     if(comment_num == 0) { BEGIN(INITIAL); }
 }
+
 <nested_comment><<EOF>> {
     yylval.error_msg = "EOF in comment";
     BEGIN(INITIAL);
+    return ERROR;
+}
+
+"*)" {
+    yylval.error_msg = "Unmatched *)";
     return ERROR;
 }
 
@@ -120,6 +126,7 @@ OBJECT_IDENTIFIERS  [a-z][a-zA-Z0-9_]*|self
 "{" { return '{'; }
 "}" { return '}'; }
 "<-" { return ASSIGN; }
+"<=" { return LE; }
 
  /*
   * Keywords are case-insensitive except for the values true and false,
@@ -191,17 +198,17 @@ f(?i:alse)   {
         return STR_CONST;
     }
 
-    "\\0" { 
-        yylval.error_msg = "String contains null character";
-        return ERROR;
-    }
-
-    \\[0-9]+ {
+    "\n" {
+        curr_lineno++;
         yylval.error_msg = "Unterminated string constant";
+        BEGIN(INITIAL);
         return ERROR;
     }
     
-    "\\\n" {curr_lineno++; }
+    "\\\n" {
+        *string_buf_ptr++ = '\n';
+        curr_lineno++; 
+    }
     "\\n" { *string_buf_ptr++ = '\n'; }
     "\\t" { *string_buf_ptr++ = '\t'; }
     "\\b" { *string_buf_ptr++ = '\b'; }
