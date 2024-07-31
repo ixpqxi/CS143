@@ -45,7 +45,6 @@ extern YYSTYPE cool_yylval;
 
 int comment_num = 0;
 int isnull = 0;
-int islong = 0;
 
 %}
 %option noyywrap
@@ -67,7 +66,6 @@ OBJECT_IDENTIFIERS  [a-z][a-zA-Z0-9_]*|self
 %x line_comment
 %x nested_comment
 %x str
-%x longstr
 
 %%
 <INITIAL,nested_comment>{BLANK} {}
@@ -162,10 +160,6 @@ f(?i:alse)   {
 }
 
 
-
-
-
-
 {INTEGERS} {
     yylval.symbol = inttable.add_string(yytext);
     return INT_CONST;
@@ -180,30 +174,29 @@ f(?i:alse)   {
 }
 
 
-
-
  /*
   *  String constants (C syntax)
   *  Escape sequence \c is accepted for all characters c. Except for 
   *  \n \t \b \f, the result is c.
   *
   */
-\" { 
-    if(strlen(string_buf) >= 1024) {
-        BEGIN(longstr);
-    }else{
-        string_buf_ptr = string_buf;
-        BEGIN(str);
-    }
+\" {
+    string_buf_ptr = string_buf;
+    BEGIN(str);
 }
 
 <str>{
     \" { 
         *string_buf_ptr = '\0';
         BEGIN(INITIAL);
-        if(!isnull){
-            yylval.symbol = inttable.add_string(string_buf);
-            return STR_CONST;
+        if(string_buf_ptr-string_buf > 1024){
+            yylval.error_msg = "String constant too long";
+            return ERROR;
+        }else{
+            if(!isnull){
+                yylval.symbol = inttable.add_string(string_buf);
+                return STR_CONST;
+            }
         }
     }
 
@@ -244,13 +237,6 @@ f(?i:alse)   {
         BEGIN(INITIAL);
         return ERROR;
     }
-}
-
-<longstr>(.|\n)* {
-    yylval.error_msg = "String constant too long";
-    islong = 0;
-    BEGIN(INITIAL);
-    return ERROR;
 }
 
 . {
