@@ -44,6 +44,8 @@ extern YYSTYPE cool_yylval;
  */
 
 int comment_num = 0;
+int isnull = 0;
+int islong = 0;
 
 %}
 %option noyywrap
@@ -65,6 +67,7 @@ OBJECT_IDENTIFIERS  [a-z][a-zA-Z0-9_]*|self
 %x line_comment
 %x nested_comment
 %x str
+%x longstr
 
 %%
 <INITIAL,nested_comment>{BLANK} {}
@@ -186,25 +189,33 @@ f(?i:alse)   {
   *
   */
 \" { 
-    string_buf_ptr = string_buf;
-    BEGIN(str);
+    if(strlen(string_buf) >= 1024) {
+        BEGIN(longstr);
+    }else{
+        string_buf_ptr = string_buf;
+        BEGIN(str);
+    }
 }
 
 <str>{
     \" { 
-        *string_buf_ptr = '\0'; 
+        *string_buf_ptr = '\0';
         BEGIN(INITIAL);
-        yylval.symbol = inttable.add_string(string_buf);
-        return STR_CONST;
+        if(!isnull){
+            yylval.symbol = inttable.add_string(string_buf);
+            return STR_CONST;
+        }
     }
 
     "\n" {
         curr_lineno++;
-        yylval.error_msg = "Unterminated string constant";
         BEGIN(INITIAL);
-        return ERROR;
+        if(!isnull && string_buf_ptr-string_buf < 1024){
+            yylval.error_msg = "Unterminated string constant";
+            return ERROR;
+        }
     }
-    
+
     "\\\n" {
         *string_buf_ptr++ = '\n';
         curr_lineno++; 
@@ -214,12 +225,18 @@ f(?i:alse)   {
     "\\b" { *string_buf_ptr++ = '\b'; }
     "\\f" { *string_buf_ptr++ = '\f'; }
 
-    \\(.|\n) { *string_buf_ptr++ = yytext[1]; }
+    \\([^\x00]|\n) { *string_buf_ptr++ = yytext[1]; }
 
-    [^\\\n\"]+ {
+    [^\\\n\x00\"]+ {
         char *yptr = yytext;
         while(*yptr != '\0')
             *string_buf_ptr++ = *yptr++;
+    }
+
+    (.|\n)*[\x00]+ {
+        yylval.error_msg = "String contains escaped null character.";
+        isnull = 1;
+        return ERROR;
     }
 
     <<EOF>> {
@@ -227,6 +244,13 @@ f(?i:alse)   {
         BEGIN(INITIAL);
         return ERROR;
     }
+}
+
+<longstr>(.|\n)* {
+    yylval.error_msg = "String constant too long";
+    islong = 0;
+    BEGIN(INITIAL);
+    return ERROR;
 }
 
 . {
