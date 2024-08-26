@@ -177,7 +177,7 @@
       { $$ = class_($2, idtable.add_string("Object"), $4, stringtable.add_string(curr_filename)); }
     | CLASS TYPEID INHERITS TYPEID '{' feature_list '}' ';'
       { $$ = class_($2,$4,$6,stringtable.add_string(curr_filename)); }
-    | CLASS error ';' {}
+    | error {}
     ;
     
     /* Feature list may be empty, but no empty features in list. */
@@ -238,13 +238,14 @@
       { $$ = cond($2, $4, $6); }
     | WHILE texpr LOOP texpr POOL 
       { $$ = loop($2, $4); }
+    | WHILE texpr LOOP error {}
     | '{' nnexpr_list '}' 
       { $$ = block($2); }
     | LET let_list
       {$$ = $2; }
     | CASE texpr OF case_list ESAC 
       { $$ = typcase($2, $4); }
-    | NEW OBJECTID 
+    | NEW TYPEID
       { $$ = new_($2); }
     | ISVOID texpr 
       { $$ = isvoid($2); }
