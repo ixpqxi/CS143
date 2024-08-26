@@ -3,4 +3,12 @@ c.cl
 lexer
 src/PA2/cool-lex.cc
 src/PA2/pa1-grading.pl
+src/PA3/pa2-grading.pl
 grading/
+
+
+## PA3
+src/PA3/cgen
+src/PA3/cool-parse.cc
+src/PA3/cool.output
+src/PA3/semant
